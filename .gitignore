@@ -1,0 +1,11 @@
+./*
+find_missing_sds_v1
+find_missing_sds_v2
+find_missing_sds_v3
+find_missing_sds_v4
+find_missing_sds_virtualenv
+helper.txt
+msds 
+*.html
+__pycache__
+find_missing_sds_temp.py 
