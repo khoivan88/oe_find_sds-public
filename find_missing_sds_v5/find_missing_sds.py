@@ -77,7 +77,7 @@ def main():
         cursor_select = mariadb_connection.cursor(buffered=True)
 
         # Step1: run SELECT query to find CAS#
-        print('Getting molecules with missing sds. Please wait!')
+        print('Getting molecules with missing SDS. Please wait!')
         # query = ("SELECT distinct cas_nr FROM molecule WHERE smiles='' and cas_nr!=''")
         query = ("SELECT distinct cas_nr FROM molecule WHERE cas_nr!='' AND (default_safety_sheet_by is NULL or default_safety_sheet_by='Acros')")
         try:
@@ -96,7 +96,7 @@ def main():
         # https://docs.python.org/3/library/os.html#os.makedirs
         os.makedirs(download_path, exist_ok=True)
 
-        print('Downloading missing sds files. Please wait!')
+        print('Downloading missing SDS files. Please wait!')
         # # Using multithreading
         try:
             with Pool(25) as p:
@@ -310,7 +310,7 @@ def update_sql_sds(mariadb_connection, cas_nr):
     # if molfile exists or downloaded (extracting_mol return -1 or 0)
     if sds_file.exists():
         print('CAS# {}: '.format(cas_nr), end='')
-        query = ("UPDATE molecule SET default_safety_sheet_blob=LOAD_FILE(%s), default_safety_sheet_by='MSDS', default_safety_sheet_url=NULL, default_safety_sheet_mime='application/pdf' WHERE cas_nr=%s")
+        query = ("UPDATE molecule SET default_safety_sheet_blob=LOAD_FILE(%s), default_safety_sheet_by='SDS', default_safety_sheet_url=NULL, default_safety_sheet_mime='application/pdf' WHERE cas_nr=%s")
         cursor_update.execute(query, (file_path, cas_nr))
         mariadb_connection.commit()
         # cursor_update.execute("flush table molecule")
