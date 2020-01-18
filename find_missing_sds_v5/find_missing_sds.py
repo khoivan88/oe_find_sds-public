@@ -99,7 +99,7 @@ def main():
         print('Downloading missing SDS files. Please wait!')
         # # Using multithreading
         try:
-            with Pool(25) as p:
+            with Pool(10) as p:
                 p.map(download_sds, to_be_downloaded)
         # except ValueError as error_1:
         #     print('.', end='')
@@ -174,9 +174,10 @@ def download_sds(cas_nr):
                 # Check to see if give OK status (200) and not redirect
                 if r.status_code == 200 and len(r.history) == 0:
                 # if full_url is not None:
-                    print('Downloading {} ...'.format(file_name))
+                    print('\nDownloading {} ...'.format(file_name))
                     download_filename = download_path + '/' + file_name
                     wget.download(full_url, out=download_filename, bar=wget.bar_thermometer)
+                    print()
                     return 0
         except Exception as error:
             # pass
@@ -309,7 +310,7 @@ def update_sql_sds(mariadb_connection, cas_nr):
 
     # if molfile exists or downloaded (extracting_mol return -1 or 0)
     if sds_file.exists():
-        print('CAS# {}: '.format(cas_nr), end='')
+        print('CAS# {:20}: '.format(cas_nr), end='')
         query = ("UPDATE molecule SET default_safety_sheet_blob=LOAD_FILE(%s), default_safety_sheet_by='SDS', default_safety_sheet_url=NULL, default_safety_sheet_mime='application/pdf' WHERE cas_nr=%s")
         cursor_update.execute(query, (file_path, cas_nr))
         mariadb_connection.commit()
