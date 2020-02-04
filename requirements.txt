@@ -1,4 +1,4 @@
-beautifulsoup4==4.6.1
+beautifulsoup4==4.8.2
 certifi==2018.4.16
 chardet==3.0.4
 idna==2.7
