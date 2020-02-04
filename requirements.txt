@@ -1,5 +1,5 @@
 beautifulsoup4==4.8.2
-certifi==2018.4.16
+certifi==2019.11.28
 chardet==3.0.4
 idna==2.7
 mysql-connector-python==8.0.12
