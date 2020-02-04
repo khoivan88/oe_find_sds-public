@@ -1,4 +1,6 @@
-﻿# FIND MISSING SDS FOR CHEMICALS IN OPEN ENVENTORY
+[![Python 3](https://pyup.io/repos/github/khoivan88/find_missing_sds-public/python-3-shield.svg)](https://pyup.io/repos/github/khoivan88/find_missing_sds-public/)
+
+# FIND MISSING SDS FOR CHEMICALS IN OPEN ENVENTORY
 <br/>
 This program is designed specifically for Open Enventory to fix issue with
 molecule missing sds (could not be extracted through "Read data from supplier")
