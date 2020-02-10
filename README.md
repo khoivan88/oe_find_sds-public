@@ -1,4 +1,6 @@
-[![Python 3](https://pyup.io/repos/github/khoivan88/find_missing_sds-public/python-3-shield.svg)](https://pyup.io/repos/github/khoivan88/find_missing_sds-public/)
+[![Python 3](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/python-3-shield.svg)](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/)
+[![Updates](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/shield.svg)](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/)
+
 
 # FIND MISSING SDS FOR CHEMICALS IN OPEN ENVENTORY
 <br/>
