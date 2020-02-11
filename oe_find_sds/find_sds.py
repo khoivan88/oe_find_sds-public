@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 """
 This program is designed specifically for Open Enventory to fix issue with
 molecule missing sds (could not be extracted through "Read data from supplier")
@@ -14,7 +16,8 @@ Version 5:
     by setting them to NULL
 
 Version 4:
-    - Testing using cheminfo.org/webservices by extracting catalog number from fluorochem
+    - Testing using cheminfo.org/webservices by extracting catalog number from 
+    http://www.fluorochem.co.uk/
 
 Version 3:
     - Refractored extracting url download into its own method
@@ -29,19 +32,22 @@ Version 2:
 """
 
 
-#!/usr/bin/python
-
-import os
-from pathlib import Path
-import mysql.connector as mariadb
-import requests, json
-import wget
-from bs4 import BeautifulSoup
-from multiprocessing import Pool
 import getpass
+import json
+import os
+from multiprocessing import Pool
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
+
+import mysql.connector as mariadb
+import requests
+# import wget
+from bs4 import BeautifulSoup
 
 download_path = '/var/lib/mysql/missing_sds'
 missing_sds = set()
+debug = False
+
 
 def main():
     global download_path
@@ -78,7 +84,6 @@ def main():
 
         # Step1: run SELECT query to find CAS#
         print('Getting molecules with missing SDS. Please wait!')
-        # query = ("SELECT distinct cas_nr FROM molecule WHERE smiles='' and cas_nr!=''")
         query = ("SELECT distinct cas_nr FROM molecule WHERE cas_nr!='' AND (default_safety_sheet_by is NULL or default_safety_sheet_by='Acros')")
         try:
             cursor_select.execute(query)
@@ -133,6 +138,10 @@ def main():
             print('\t{} SDS files are missing: '.format(len(missing_sds)))
             print('\t{} SDS files updated! '.format(count_file_updated))
 
+            # Advice user about turning on debug mode for more error printing
+            print('\n\n(Optional): you can turn on debug mode (more error printing during structure search) using the following command:')
+            print('python oe_find_sds/find_sds.py  --debug')
+
     except mariadb.Error as err:
         if err.errno == mariadb.errorcode.ER_ACCESS_DENIED_ERROR:
             print("Wrong password!")
@@ -143,8 +152,24 @@ def main():
     else:
         mariadb_connection.close()
 
-def download_sds(cas_nr):
-    global download_path
+
+def download_sds(cas_nr: str) -> int:
+    """This function takes cas_nr and try to download its SDS
+    
+    Parameters
+    ----------
+    cas_nr : str
+        the CAS# for a chemical of interests
+    
+    Returns
+    -------
+    int
+        -1: if download file already exists
+        0: if download successful
+        1: if there is error
+    
+    """
+    global download_path, debug
     '''This function is used to extract a single sds file
     See here for more info: http://stackabuse.com/download-files-with-python/'''
 
@@ -152,7 +177,7 @@ def download_sds(cas_nr):
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36'}
 
     file_name = cas_nr + '.pdf'
-    download_file = Path(download_path + '/' + file_name)
+    download_file = Path(download_path) / file_name
     # Check if the file not exists and download
     #check file exists: https://stackoverflow.com/questions/82831/how-do-i-check-whether-a-file-exists
     if download_file.exists():
@@ -160,81 +185,131 @@ def download_sds(cas_nr):
         print('.', end='')
         return -1
     else:
+        print('\nSearching {} ...'.format(file_name))
         try:
             # print('CAS {} ...'.format(file_name))
-            full_url = extract_download_url_from_fisher(cas_nr)
+            sds_source, full_url = extract_download_url_from_fisher(cas_nr) or (None, None)
             if full_url is None:    # extract with chemicalsafety
-                full_url = extract_download_url_from_chemicalsafety(cas_nr)
-            if full_url is None:    # extract with chemicalsafety
-                full_url = extract_download_url_from_fluorochem(cas_nr)
+                sds_source, full_url = extract_download_url_from_chemicalsafety(cas_nr) or (None, None)
+            if full_url is None:    # extract with fluorochem
+                sds_source, full_url = extract_download_url_from_fluorochem(cas_nr) or (None, None)
             # print('full url is: {}'.format(full_url))
             if full_url:    # extract with chemicalsafety
-                # print('Would you get to here?')
                 r = requests.get(full_url, headers=headers, timeout=20)
                 # Check to see if give OK status (200) and not redirect
                 if r.status_code == 200 and len(r.history) == 0:
-                # if full_url is not None:
-                    print('\nDownloading {} ...'.format(file_name))
-                    download_filename = download_path + '/' + file_name
-                    wget.download(full_url, out=download_filename, bar=wget.bar_thermometer)
+                    # print('\nDownloading {} ...'.format(file_name))
+                    open(download_file, 'wb').write(r.content)
                     print()
                     return 0
+            else:
+                return 1
         except Exception as error:
             # pass
             # raise ValueError('{}: SDS not found from Fisher, VWR, or FluoroChem/Oakwood'.format(cas_nr))
-            print(error)
+            if debug:
+                print(error)
+            return 1
             # print("Could not find SDS")
-        # try:
-        # except Exception as error:
-        #     # print('.', end='')
 
 
-def extract_download_url_from_fisher(cas_nr):
+def extract_download_url_from_fisher(cas_nr: str) -> Optional[Tuple[str, str]]:
+    """Search for url to download SDS for chemical with cas_nr
+    from https://www.fishersci.com
+    
+    Parameters
+    ----------
+    cas_nr : str
+        CAS# for chemical of interest
+    
+    Returns
+    -------
+    Optional[Tuple[str, str]]
+        Tuple[str, str]:
+            the name of the SDS source
+            the URL from Fisher for SDS file
+        None: if URL cannot be found
+    """
     headers = {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36'}
 
     # get url from Fisher to get url to download sds file
     extract_info_url = 'https://www.fishersci.com/us/en/catalog/search/sds'
-    payload = {'selectLang' : 'EN',
-                'msdsKeyword' : cas_nr}
+    payload = {'selectLang': 'EN',
+            'msdsKeyword': cas_nr}
+
+    if debug:
+        print('Searching on https://www.fishersci.com/us/en/catalog/search/sdshome.html')
 
     try:
         r = requests.get(extract_info_url, headers=headers, timeout=10, params=payload)
         # Check to see if give OK status (200) and not redirect
         if r.status_code == 200 and len(r.history) == 0:
-            #BeautifulSoup ref: https://www.digitalocean.com/community/tutorials/how-to-scrape-web-pages-with-beautiful-soup-and-python-3
+            # BeautifulSoup ref: https://www.digitalocean.com/community/tutorials/how-to-scrape-web-pages-with-beautiful-soup-and-python-3
             # Using BeautifulSoup to scrap text
             html = BeautifulSoup(r.text, 'html.parser')
             # The list of found sds is in class 'catalog_num', with each item in class 'catlog_items'
             # cat_no_list = html.find(class_='catalog_num')    # This is to find all of the sds
+
+            # Check if there is error message. Fisher automatically does a close search with error message
+            error_message = html.find(class_='errormessage search_results_error_message')
             cat_no_list = html.find(class_='catlog_items')    # This will find the first sds
-            if cat_no_list:
+            
+            if (not error_message) and cat_no_list:
                 cat_no_items = cat_no_list.find_all('a')   #
                 # download info
                 rel_download_url = cat_no_items[0].get('href')
                 catalogID = cat_no_items[0].contents[0]
                 full_url = 'https://www.fishersci.com' + rel_download_url
-                return full_url
+                # print(f'rel_download_url is {rel_download_url}')
+                return 'Fisher', full_url
+
 
     except Exception as error:
         # print('.', end='')
-        print(error)
+        if debug:
+            print(error)
         # return None
 
 
-def extract_download_url_from_chemicalsafety(cas_nr):
+def extract_download_url_from_chemicalsafety(cas_nr: str) -> Optional[Tuple[str, str]]:
+    """Search for url to download SDS for chemical with cas_nr
+    from https://chemicalsafety.com/sds-search/
+    
+    Parameters
+    ----------
+    cas_nr : str
+        CAS# for chemical of interest
+    
+    Returns
+    -------
+    Optional[Tuple[str, str]]
+        Tuple[str, str]:
+            the name of the SDS source
+            the URL from Fisher for SDS file
+        None: if URL cannot be found
+    """
     headers = {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
         'accept-encoding': 'gzip, deflate, br',
-        'content-type' : 'application/json'}
+        'content-type': 'application/json'}
     # get url from chemicalsafety.com to get url to download sds file
     extract_info_url = 'https://chemicalsafety.com/sds1/retriever.php'
-    form1  = {  "action":"search", "p1":"MSMSDS.COMMON|",
-                "p2":"MSMSDS.MANUFACT|", "p3":"MSCHEM.CAS|" + cas_nr,
-                "hostName":"chemicalsafety.com", "isContains":"0"  }
+    form1 = {
+        "action": "search", 
+        "p1": "MSMSDS.COMMON|",
+        "p2": "MSMSDS.MANUFACT|", 
+        "p3": "MSCHEM.CAS|" + cas_nr,
+        "hostName": "chemicalsafety.com", 
+        "isContains": "0"
+        }
+
+    if debug:
+        print('Searching on chemicalsafety.com/sds-search')
 
     try:
-        r1 = requests.post(extract_info_url, headers=headers, data=json.dumps(form1), timeout=20)
+        r1 = requests.post(extract_info_url, headers=headers, 
+                data=json.dumps(form1), timeout=20)
         # Check to see if give OK status (200) and not redirect
         if r1.status_code == 200 and len(r1.history) == 0:
             id_list = r1.json()['rows']
@@ -244,8 +319,13 @@ def extract_download_url_from_chemicalsafety(cas_nr):
                     msds_id = item[0]
                     break
             if msds_id != '':
-                form2  ={"action":"msdsdetail","p1":msds_id,"p2":"","p3":"","isContains":""}
-                r2 = requests.post(extract_info_url, headers=headers, data=json.dumps(form2), timeout=20)
+                form2 = {"action": "msdsdetail",
+                        "p1": msds_id,
+                        "p2": "",
+                        "p3": "",
+                        "isContains": ""}
+                r2 = requests.post(extract_info_url, headers=headers, 
+                        data=json.dumps(form2), timeout=20)
                 result = r2.json()['rows'][0]
                 #Confirm the msds_id and cas_nr:
                 if msds_id == result[0] and cas_nr == result[3]:
@@ -256,30 +336,53 @@ def extract_download_url_from_chemicalsafety(cas_nr):
                     # Translate curl to python https://curl.trillworks.com/
                     # urllib.parse doc: https://docs.python.org/3.6/library/urllib.parse.html
                     full_url = r3.json()['url']
-                    return full_url
+                    return 'ChemicalSafety', full_url
     except Exception as error:
         # print('.', end='')
-        print(error)
+        if debug:
+            print(error)
         # return None
 
 
-def extract_download_url_from_fluorochem(cas_nr):
-    global download_path
+def extract_download_url_from_fluorochem(cas_nr: str) -> Optional[Tuple[str, str]]:
+    """Search for url to download SDS for chemical with cas_nr
+    from http://www.fluorochem.co.uk/
+    
+        
+    Parameters
+    ----------
+    cas_nr : str
+        CAS# for chemical of interest
+    
+    Returns
+    -------
+    Optional[Tuple[str, str]]
+        Tuple[str, str]:
+            the name of the SDS source
+            the URL from Fisher for SDS file
+        None: if URL cannot be found
+    """
     headers = {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
-         'Content-Type': 'application/json',}
+        'Content-Type': 'application/json', }
 
     url = 'http://www.fluorochem.co.uk/Products/Search'
     payload = {
-        "lstSearchType":"C","txtSearchText":cas_nr,
-        "showPrices":'false',"showStructures":'false',"groupFilters":[]}
+        "lstSearchType": "C",
+        "txtSearchText": cas_nr,
+        "showPrices": 'false',
+        "showStructures": 'false',
+        "groupFilters": []}
+
+    if debug:
+        print('Searching on fluorochem.co.uk')
 
     try:
         r = requests.post(url, headers=headers, timeout=20, data=json.dumps(payload))
         # No need to check if requests give OK status (200) and not redirect because
         # fluorochem return code 200 without redirect with error
 
-        #BeautifulSoup ref: https://www.digitalocean.com/community/tutorials/how-to-scrape-web-pages-with-beautiful-soup-and-python-3
+        # BeautifulSoup ref: https://www.digitalocean.com/community/tutorials/how-to-scrape-web-pages-with-beautiful-soup-and-python-3
         # Using BeautifulSoup to scrap text
         html = BeautifulSoup(r.text, 'html.parser')
         if html:
@@ -294,14 +397,15 @@ def extract_download_url_from_fluorochem(cas_nr):
                 # download info
                 download_url = 'https://www.cheminfo.org/webservices/msds?brand=fluorochem&catalog={}&embed=true'
                 full_url = download_url.format(cat_no_2)
-                return full_url
+                return 'Fluorochem', full_url
     except Exception as error:
         #     print('.', end='')
-        print(error)
+        if debug:
+            print(error)
         # return None
 
 
-def update_sql_sds(mariadb_connection, cas_nr):
+def update_sql_sds(mariadb_connection, cas_nr: str, sds_source: str = 'SDS') -> int:
     global download_path
     cursor_update = mariadb_connection.cursor(buffered=True)
     file_path = download_path + '/{}.pdf'.format(cas_nr)
@@ -311,8 +415,13 @@ def update_sql_sds(mariadb_connection, cas_nr):
     # if molfile exists or downloaded (extracting_mol return -1 or 0)
     if sds_file.exists():
         print('CAS# {:20}: '.format(cas_nr), end='')
-        query = ("UPDATE molecule SET default_safety_sheet_blob=LOAD_FILE(%s), default_safety_sheet_by='SDS', default_safety_sheet_url=NULL, default_safety_sheet_mime='application/pdf' WHERE cas_nr=%s")
-        cursor_update.execute(query, (file_path, cas_nr))
+        query = ('''UPDATE molecule 
+            SET default_safety_sheet_blob=LOAD_FILE('{}'), 
+                default_safety_sheet_by='{}', 
+                default_safety_sheet_url=NULL, 
+                default_safety_sheet_mime='application/pdf' 
+            WHERE cas_nr={}'''.format(file_path, sds_source, cas_nr))
+        cursor_update.execute(query)
         mariadb_connection.commit()
         # cursor_update.execute("flush table molecule")
         print('\tSDS uploaded successfully!')
@@ -321,6 +430,7 @@ def update_sql_sds(mariadb_connection, cas_nr):
     else:
         missing_sds.add(cas_nr)
         return 0
+
 
 if __name__ == '__main__':
     main()

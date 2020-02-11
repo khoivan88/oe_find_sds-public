@@ -20,34 +20,42 @@ This programs does:
 This programs does:
 1. Connect into mysql database and find molecule in 'molecule' table
 of specific database and find those molecule with missing sds
-2. Try to download sds files into a folder in /var/lib/mysql/missing_sds
-3. Update those sql entries with new downloaded sds files
+2. Try to download sds files into a folder in `/var/lib/mysql/missing_sds`
+3. Update those SQL entries with new downloaded sds files
 
 
 ## REQUIREMENTS
 
-- root access to the server hosting Open Enventory
+- root access to the server hosting Open Enventory (to create a download folder if not existed)
 - Python 3+
-- This file is made for Linux environment, you should be able
-  to used it on other OS with changing the location of the "download_path"
+- This file is made for **Linux** environment, you should be able
+  to used it on other OS by changing the location of the ["download_path"](oe_find_sds/find_sds.py#L47)
 
 
 ## USAGE
 
 After cloning this repo onto the Open Enventory server:
 
-1. Change into directory of the new file:
+1. Clone this repository:
    
    ```bash
-   cd find_missing_sds-public
+   git clone https://github.com/khoivan88/oe_find_sds-public.git    #if you have git
+   # if you don't have git, you can download the zip file then unzip
+   ```
+
+2. Change into the directory of the program:
+   
+   ```bash
+   cd oe_find_sds-public
    ```
 
 2. (Optional): create virtual environment for python to install dependency:
    
    ```bash
-   # you can change "find_missing_sds_venv" to another name too
-   python3 -m venv find_missing_sds_venv   # Create virtual environment
-   source find_missing_sds_venv/bin/activate    # Activate the virtual environment
+   # you can change "oe_find_sds_venv" to another name too
+   python3 -m venv oe_find_sds_venv   # Create virtual environment
+   source oe_find_sds_venv/bin/activate    # Activate the virtual environment on Linux
+   # oe_find_sds_venv/Scripts/activate    # Activate the virtual environment on Windows
    ```
 
 3. Install python dependencies:
@@ -59,8 +67,7 @@ After cloning this repo onto the Open Enventory server:
 4. Run the program:
    
    ```bash
-   # Replace "find_missing_sds_v5" with latest version if neccessary
-   python3 find_missing_sds_v5/find_missing_sds.py
+   python3 oe_find_sds/find_sds.py
    ```
 
    - Answer questions for:
