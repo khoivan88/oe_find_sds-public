@@ -26,10 +26,12 @@ of specific database and find those molecule with missing sds
 
 ## REQUIREMENTS
 
-- root access to the server hosting Open Enventory (to create a download folder if not existed)
 - Python 3+
+- Linux machine root access to the server hosting Open Enventory (to create a download folder if not existed). If user does not have root account (or sudo), you can:
+  1. Change the `download_path` to a different location that you have read and write permission.
+  2. Comment out [`exit(1)`](oe_find_sds/find_sds.py#L45) in `find_sds.py` file
 - This file is made for **Linux** environment, you should be able
-  to used it on other OS by changing the location of the ["download_path"](oe_find_sds/find_sds.py#L47)
+  to used it on other OS by changing the location of the ["download_path"](oe_find_sds/find_sds.py#L30)
 
 
 ## USAGE
@@ -50,9 +52,9 @@ After cloning this repo onto the Open Enventory server:
    ```
 
 2. (Optional): create virtual environment for python to install dependency:
-   
+   Note: you can change `oe_find_sds_venv` to another name if desired.
+
    ```bash
-   # you can change "oe_find_sds_venv" to another name too
    python3 -m venv oe_find_sds_venv   # Create virtual environment
    source oe_find_sds_venv/bin/activate    # Activate the virtual environment on Linux
    # oe_find_sds_venv/Scripts/activate    # Activate the virtual environment on Windows
@@ -78,24 +80,4 @@ After cloning this repo onto the Open Enventory server:
 
 
 ## VERSIONS
-
-### Version 5:
-- Incorporated result from Fluorochem
-- Fixing bug with existing default_safety_sheet_url and default_safety_sheet_mime
-    by setting them to NULL
-
-
-### Version 4:
-- Testing using cheminfo.org/webservices by extracting catalog number from fluorochem
-
-
-### Version 3:
-- Refactor extracting url download into its own method
-- Add extracting url download from chemicalsafety.com
-
-
-### Version 2:
-- Add asking if user is root and password
-- Add asking what database to be modified
-- Switch to extracting data from https://www.fishersci.com because Chemexper
-    has limited requests
+See [here](VERSION.md) for the most up-to-date

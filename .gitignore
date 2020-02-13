@@ -6,3 +6,4 @@ dev/
 
 find_missing_sds_v[1-5]
 find_missing_sds_virtualenv
+*venv*/

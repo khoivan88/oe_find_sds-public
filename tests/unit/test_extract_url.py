@@ -17,7 +17,7 @@ def mock_raise_exception():
     "cas_nr, expect", [
         ('623-51-8', (
             'Fisher',
-            'https://www.fishersci.com/store/msds?partNumber=AAA1432106&productDescription=ethyl-mercaptoacetate-&vendorId=VN00024248&keyword=true&countryCode=US&language=en'
+            'https://www.fishersci.com/store/msds?partNumber=AAA1432136&productDescription=ethyl-mercaptoacetate-&vendorId=VN00024248&keyword=true&countryCode=US&language=en'
             )
         ),
         ('28697-53-2', (

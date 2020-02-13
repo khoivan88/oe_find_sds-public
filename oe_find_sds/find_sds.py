@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 """
+Author: Khoi Van
+
 This program is designed specifically for Open Enventory to fix issue with
 molecule missing sds (could not be extracted through "Read data from supplier")
 
@@ -9,39 +11,20 @@ This programs does:
 of specific database and find those molecule with missing sds
     2. Try to download sds files into a folder in /var/lib/mysql/missing_sds
     3. Update those sql entries with new downloaded sds files
-
-Version 5:
-    - Incorporated result from Fluorochem
-    - Fixing bug with existing default_safety_sheet_url and default_safety_sheet_mime
-    by setting them to NULL
-
-Version 4:
-    - Testing using cheminfo.org/webservices by extracting catalog number from 
-    http://www.fluorochem.co.uk/
-
-Version 3:
-    - Refractored extracting url download into its own method
-    - Added extracting url download from chemicalsafety.com
-
-Version 2:
-    - Added asking if user is root and password
-    - Added asking what database to be modified
-    - Switch to extracting data from https://www.fishersci.com because Chemexper
-    has limited requests
-
 """
 
 
 import getpass
 import json
 import os
+import sys
+import traceback
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import mysql.connector as mariadb
 import requests
-# import wget
 from bs4 import BeautifulSoup
 
 download_path = '/var/lib/mysql/missing_sds'
@@ -50,12 +33,16 @@ debug = False
 
 
 def main():
-    global download_path
-    # Require user running this python as root
-    if_root = input('Are you login as root user? (y/n): ')
-    if (if_root not in ['y', 'yes']):
-        print('You need to convert to root user before running this program')
-        exit(1)
+    global download_path, debug
+
+    if len(sys.argv) == 2 and sys.argv[1] in ['--debug=True', '--debug=true', '--debug', '-d']:
+        debug = True
+
+    # Require user running this python as root for creating download_path
+    is_root = input('Are you login as root user? (y/n): ')
+    if (is_root not in ['y', 'yes']):
+        print('You need to convert to root user before running this program (or run with `sudo`) ')
+        exit(1)    # Comment this line out if you have change the download_path to a location that you have read and write permissions.
     # Get user input for root password and the database needs to be updated
     # to hide password input: https://stackoverflow.com/questions/9202224/getting-command-line-password-input-in-python
     password = getpass.getpass('Please type in the password for MySQL "root" user: ')
@@ -84,7 +71,7 @@ def main():
 
         # Step1: run SELECT query to find CAS#
         print('Getting molecules with missing SDS. Please wait!')
-        query = ("SELECT distinct cas_nr FROM molecule WHERE cas_nr!='' AND (default_safety_sheet_by is NULL or default_safety_sheet_by='Acros')")
+        query = ("SELECT distinct cas_nr FROM molecule WHERE cas_nr!='' AND (default_safety_sheet_blob is NULL or default_safety_sheet_by is NULL or default_safety_sheet_by='Acros')")
         try:
             cursor_select.execute(query)
         except mariadb.Error as error:
@@ -102,14 +89,17 @@ def main():
         os.makedirs(download_path, exist_ok=True)
 
         print('Downloading missing SDS files. Please wait!')
+        
+        download_result = []
         # # Using multithreading
         try:
             with Pool(10) as p:
-                p.map(download_sds, to_be_downloaded)
-        # except ValueError as error_1:
-        #     print('.', end='')
+                download_result = p.map(download_sds, to_be_downloaded)
+            
         except Exception as error:
-            print(error)
+            if debug:
+                traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+                print(traceback_str)
 
         # # Not using multithreading
         # # to_be_downloaded = ['9012-36-6']   # for testing only
@@ -121,53 +111,58 @@ def main():
 
         # Step 3: run UPDATE query to upload
         finally:
+            # Sometimes Pool worker return 'None', remove 'None' as the following
+            download_result = [x for x in download_result if x]
+
             print('Updating SQL table!')
             count_file_updated = 0
-            # for cas in downloaded_sds:
-            for cas in to_be_downloaded:
+            # for cas in to_be_downloaded:
+            for cas, downloaded, sds_source in download_result:
                 try:
                     # run update_sql() and also increment the count for successful update
                     # update_sql() return 1 if successs, otherwise return 0
-                    count_file_updated += update_sql_sds(mariadb_connection, cas)
+                    count_file_updated += update_sql_sds(mariadb_connection, cas_nr=cas, sds_source=sds_source)
                 except mariadb.Error as error:
                     print('Error: {}'.format(error))
 
             mariadb_connection.close()
+            
+            print()
             print(missing_sds)
             print('\nSummary: ')
-            print('\t{} SDS files are missing: '.format(len(missing_sds)))
+            print('\t{} SDS files are missing.'.format(len(missing_sds)))
             print('\t{} SDS files updated! '.format(count_file_updated))
 
             # Advice user about turning on debug mode for more error printing
             print('\n\n(Optional): you can turn on debug mode (more error printing during structure search) using the following command:')
-            print('python oe_find_sds/find_sds.py  --debug')
+            print('python oe_find_sds/find_sds.py  --debug\n')
 
-    except mariadb.Error as err:
-        if err.errno == mariadb.errorcode.ER_ACCESS_DENIED_ERROR:
+    except mariadb.Error as error:
+        if error.errno == mariadb.errorcode.ER_ACCESS_DENIED_ERROR:
             print("Wrong password!")
-        elif err.errno == mariadb.errorcode.ER_BAD_DB_ERROR:
+        elif error.errno == mariadb.errorcode.ER_BAD_DB_ERROR:
             print("Database does not exist")
         else:
-            print(err)
+            traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+            print(traceback_str)
     else:
         mariadb_connection.close()
 
 
-def download_sds(cas_nr: str) -> int:
-    """This function takes cas_nr and try to download its SDS
-    
+def download_sds(cas_nr: str) -> Tuple[str, bool, Optional[str]]:
+    """Download SDS from variety of sources
+
     Parameters
     ----------
     cas_nr : str
-        the CAS# for a chemical of interests
-    
+        The CAS number of the molecule of interest
+
     Returns
     -------
-    int
-        -1: if download file already exists
-        0: if download successful
-        1: if there is error
-    
+    Tuple[str, bool, Optional[str]]
+        - str: CAS number of the input chemical
+        - bool: True if SDS file downloaded or exists
+        - Optional[str]: the name of the SDS source or None
     """
     global download_path, debug
     '''This function is used to extract a single sds file
@@ -176,14 +171,19 @@ def download_sds(cas_nr: str) -> int:
     headers = {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36'}
 
+    # Set initial return value for if SDS is downloaded (or existed)
+    downloaded = False
+
     file_name = cas_nr + '.pdf'
     download_file = Path(download_path) / file_name
     # Check if the file not exists and download
     #check file exists: https://stackoverflow.com/questions/82831/how-do-i-check-whether-a-file-exists
     if download_file.exists():
         # print('{} already downloaded'.format(file_name))
-        print('.', end='')
-        return -1
+        # print('.', end='')
+        downloaded = True
+        return cas_nr, downloaded, None
+
     else:
         print('\nSearching {} ...'.format(file_name))
         try:
@@ -200,28 +200,33 @@ def download_sds(cas_nr: str) -> int:
                 if r.status_code == 200 and len(r.history) == 0:
                     # print('\nDownloading {} ...'.format(file_name))
                     open(download_file, 'wb').write(r.content)
-                    print()
-                    return 0
+                    # print()
+                    # return (0, sds_source)
+                    downloaded = True
+                    return (cas_nr, downloaded, sds_source)
+
             else:
-                return 1
+                return download_sds_tci(cas_nr)
+                # return 1
         except Exception as error:
             # pass
             # raise ValueError('{}: SDS not found from Fisher, VWR, or FluoroChem/Oakwood'.format(cas_nr))
             if debug:
-                print(error)
-            return 1
-            # print("Could not find SDS")
+                traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+                print(traceback_str)
+            # return 1
+            return (cas_nr, downloaded, None)
 
 
 def extract_download_url_from_fisher(cas_nr: str) -> Optional[Tuple[str, str]]:
     """Search for url to download SDS for chemical with cas_nr
     from https://www.fishersci.com
-    
+
     Parameters
     ----------
     cas_nr : str
         CAS# for chemical of interest
-    
+
     Returns
     -------
     Optional[Tuple[str, str]]
@@ -264,11 +269,11 @@ def extract_download_url_from_fisher(cas_nr: str) -> Optional[Tuple[str, str]]:
                 # print(f'rel_download_url is {rel_download_url}')
                 return 'Fisher', full_url
 
-
     except Exception as error:
         # print('.', end='')
         if debug:
-            print(error)
+            traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+            print(traceback_str)
         # return None
 
 
@@ -340,14 +345,14 @@ def extract_download_url_from_chemicalsafety(cas_nr: str) -> Optional[Tuple[str,
     except Exception as error:
         # print('.', end='')
         if debug:
-            print(error)
+            traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+            print(traceback_str)
         # return None
 
 
 def extract_download_url_from_fluorochem(cas_nr: str) -> Optional[Tuple[str, str]]:
     """Search for url to download SDS for chemical with cas_nr
     from http://www.fluorochem.co.uk/
-    
         
     Parameters
     ----------
@@ -401,33 +406,155 @@ def extract_download_url_from_fluorochem(cas_nr: str) -> Optional[Tuple[str, str
     except Exception as error:
         #     print('.', end='')
         if debug:
-            print(error)
+            traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+            print(traceback_str)
         # return None
 
 
+def download_sds_tci(cas_nr: str) -> Tuple[str, bool, Optional[str]]:
+    """Download SDS from TCI Chemicals (www.tcichemicals.com)
+
+    Parameters
+    ----------
+    cas_nr : str
+        The CAS number of the molecule of interest
+
+    Returns
+    -------
+    Tuple[str, bool, Optional[str]]
+        - str: CAS number of the input chemical
+        - bool: True if SDS file downloaded or exists
+        - str: the name of the SDS source or None
+    """
+    '''Note: this function cannot be combined with download_sds() because 
+    downloading SDS from TCI requires session and cookies'''
+
+    global download_path, debug
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36'}
+
+    adv_search_url = 'https://www.tcichemicals.com/eshop/en/us/catalog/list/search?searchCasNo={}&mode=1'.format(cas_nr)
+    
+    # Set initial return value for if SDS is downloaded (or existed)
+    downloaded = False
+
+    file_name = cas_nr + '.pdf'
+    download_file = Path(download_path) / file_name
+
+    try:
+        get_id = requests.get(adv_search_url, headers=headers, timeout=10)
+        if get_id.status_code == 200 and len(get_id.history) == 0:
+            # get_id.text
+            html = BeautifulSoup(get_id.text, 'html.parser')
+    #         print(html.prettify())
+
+            hit_count = html.find(class_='search-sum').text
+    #         hit_count
+
+            # Check to make sure that there is at least 1 hit
+            if hit_count:
+                '''
+                The first hit ('cart') have the unique ID in <form> (<form id='cart1_0'>) tag. 
+                Use this info to find the first "cart".
+                '''
+                # Find the first hit using the <form> with unique 'id'
+                first_hit_form = html.find('form', id='cart1_0')
+
+                # The info for this form is the <table> right above the first hit <form>
+                first_hit_info = first_hit_form.find_previous_sibling('table', class_='comp-tbl')
+    #             print(first_hit_info.prettify())
+
+                ''' Find the CAS# for the first hit
+                Right above the <form> tag is the chemical info. The html that show CAS#:
+                    <th class="comp-th">
+                        <span>CAS RN</span>
+                    </th>
+                    <td class="comp-td" colspan="2">
+                        <span>885051-07-0</span>
+                    </td>
+                Search for the returned_cas to match with the given CAS#
+                '''
+                returned_cas = first_hit_info.find('span', string='CAS RN').parent.find_next_sibling().span.text
+    #             print(returned_cas)
+
+                # Confirm the first hit has the same CAS# as search chemical
+                if returned_cas == cas_nr:
+                    '''The first <form> order box, have id='cart1_0'. 
+                    Inside this <form> has <input> with id='commodityCode' and value gives the TCI product number.
+                    Exammple:
+                        <form action="/eshop/en/us/catalog/list" enctype="application/x-www-form-urlencoded" id="cart1_0" method="post" name="cart1_0" onsubmit="return false;">
+                            ...
+                            <input id="commodityCode" name="commodityCode" type="hidden" value="B3296"/>
+                            ...
+                        </form>
+                    Get this TCI product number as follow:
+                    '''
+    #                 tci_id = html.find('form', id='cart1_0').find('input', id='commodityCode').get('value')
+                    tci_id = first_hit_form.find('input', id='commodityCode').get('value')
+    #                 print(tci_id)
+
+                    # Check if TCI product number is found:
+                    if tci_id:
+                        sds_url = 'https://www.tcichemicals.com/eshop/en/us/commodity/{}/'.format(tci_id)
+                        '''For some reason, TCI does not allow using sds_url2 directly, that is why this code 
+                        go to the detail page of the chemical (sds_url) and then use Session() to go to the 
+                        SDS download page (sds_url2)'''
+                        with requests.Session() as s:
+                            sds = s.get(sds_url, headers=headers, timeout=15)
+                            if sds.status_code == 200 and len(sds.history) == 0:
+                                sds_url2 = 'https://www.tcichemicals.com/eshop/en/us/catalog/detail/msds/en/{}/'.format(tci_id)
+                                sds2 = s.get(sds_url2, headers=headers, timeout=15)
+                                if sds2.status_code == 200:
+                                    open(download_file, 'wb').write(sds2.content)
+                                    downloaded = True
+                                    return (cas_nr, downloaded, 'TCI')
+    
+    except Exception as error:
+        if debug:
+            traceback_str = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
+            print(traceback_str)
+        return (cas_nr, downloaded, None)
+
+
 def update_sql_sds(mariadb_connection, cas_nr: str, sds_source: str = 'SDS') -> int:
-    global download_path
+    """Update SQL database by uploading the downloaded SDS pdf files
+    
+    Parameters
+    ----------
+    mariadb_connection : mysql.connector Object
+        an established connection to the SQL database
+    cas_nr : str
+        the CAS number of molecule that needs to be updated with new SDS
+    sds_source : str, optional
+        the name of the SDS source, by default 'SDS'
+    
+    Returns
+    -------
+    int
+        1: if success
+        0: if not, the cas_nr will also be added into global missing_sds set
+    """
+    global download_path, missing_sds
     cursor_update = mariadb_connection.cursor(buffered=True)
     file_path = download_path + '/{}.pdf'.format(cas_nr)
     sds_file = Path(file_path)
     # print(file_path)
 
-    # if molfile exists or downloaded (extracting_mol return -1 or 0)
+    # if molfile exists or downloaded
     if sds_file.exists():
+        sds_source = 'SDS' if sds_source is None else sds_source
         print('CAS# {:20}: '.format(cas_nr), end='')
-        query = ('''UPDATE molecule 
-            SET default_safety_sheet_blob=LOAD_FILE('{}'), 
-                default_safety_sheet_by='{}', 
-                default_safety_sheet_url=NULL, 
-                default_safety_sheet_mime='application/pdf' 
-            WHERE cas_nr={}'''.format(file_path, sds_source, cas_nr))
+        query = ("UPDATE molecule SET default_safety_sheet_blob=LOAD_FILE('{}'), default_safety_sheet_by='{}', default_safety_sheet_url=NULL, default_safety_sheet_mime='application/pdf' WHERE cas_nr='{}'".format(file_path, sds_source, cas_nr))
         cursor_update.execute(query)
         mariadb_connection.commit()
         # cursor_update.execute("flush table molecule")
         print('\tSDS uploaded successfully!')
         return 1
+    
     # extracting_mol return the cas# of those that it could not find mol file
     else:
+        # Add the cas_nr into global missing_sds set
         missing_sds.add(cas_nr)
         return 0
 
