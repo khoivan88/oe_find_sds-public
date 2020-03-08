@@ -57,7 +57,7 @@ After cloning this repo onto the Open Enventory server:
    ```bash
    python3 -m venv oe_find_sds_venv   # Create virtual environment
    source oe_find_sds_venv/bin/activate    # Activate the virtual environment on Linux
-   # oe_find_sds_venv/Scripts/activate    # Activate the virtual environment on Windows
+   # oe_find_sds_venv\Scripts\activate    # Activate the virtual environment on Windows
    ```
 
 3. Install python dependencies:
