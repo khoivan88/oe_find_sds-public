@@ -1,3 +1,8 @@
+## Version 0.7.0 (2020-04-02)
+
+- Feat: Add ChemBlink as another source for SDS
+- Feat: Add tests for ChemBlink
+ 
 ## Version 0.6 (2020-02-12):
 - Add TCI as another source for SDS
 - Code clean up
