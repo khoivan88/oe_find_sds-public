@@ -21,7 +21,7 @@ jobs:
       max-parallel: 3
       matrix:
         # os: [ubuntu-latest, macos-latest, windows-latest]
-        os: [ubuntu-latest]
+        os: [macos-latest]
         python-version: [3.6, 3.7, 3.8]
 #         python-version: ['3.x']
     
@@ -52,23 +52,23 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    # - name: Cache pip MacOS
-    #   uses: actions/cache@v1
-    #   if: startsWith(runner.os, 'macOS')
-    #   with:
-    #     path: ~/Library/Caches/pip
-    #     key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-pip-
+    - name: Cache pip MacOS
+      uses: actions/cache@v1
+      if: startsWith(runner.os, 'macOS')
+      with:
+        path: ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
 
-    # - name: Cache pip Windows
-    #   uses: actions/cache@v1
-    #   if: startsWith(runner.os, 'Windows')
-    #   with:
-    #     path: ~\AppData\Local\pip\Cache
-    #     key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-pip-
+    - name: Cache pip Windows
+      uses: actions/cache@v1
+      if: startsWith(runner.os, 'Windows')
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
     
     - name: Install dependencies
       run: |
@@ -91,7 +91,7 @@ jobs:
 #         pip install ./
     - name: Upload coverage to codecov.io
       uses: codecov/codecov-action@v1.0.6
-      if: startsWith(runner.os, 'Linux')
+      if: startsWith(runner.os, 'macOS')
       with:
         # CODECOV_TOKEN is repo-specific and it must be copied from codecov.io for the repository
         # and stored as a secret in GitHub's repository Settings > Secrets. CODECOV_TOKEN does not
