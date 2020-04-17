@@ -1,6 +1,8 @@
 [![Python 3](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/python-3-shield.svg)](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/)
 [![Updates](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/shield.svg)](https://pyup.io/repos/github/khoivan88/oe_find_sds-public/)
-
+[![codecov](https://codecov.io/gh/khoivan88/oe_find_sds-public/branch/master/graph/badge.svg)](https://codecov.io/gh/khoivan88/oe_find_sds-public)
+[![python version](https://img.shields.io/badge/python-v3.6%2B-blue)]()
+[![tested platforms](https://img.shields.io/badge/tested%20platform-win%20%7C%20osx%20%7C%20ubuntu-lightgrey)]()
 
 # FIND MISSING SDS FOR CHEMICALS IN OPEN ENVENTORY
 <br/>
