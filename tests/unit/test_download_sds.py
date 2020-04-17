@@ -91,7 +91,8 @@ def test_download_sds_with_existing_files(tmpdir, monkeypatch, cas_nr, expect):
 
 @pytest.mark.parametrize(
     "cas_nr, expect", [
-        ('623-51-8', ('623-51-8', False, None)),
+        # ('623-51-8', ('623-51-8', False, None)),
+        ('00000-00-0', ('00000-00-0', False, None)),
     ]
 )
 def test_download_sds_with_error(tmpdir, monkeypatch, cas_nr, expect):
