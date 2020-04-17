@@ -130,7 +130,7 @@ def main():
 
             mariadb_connection.close()
             
-            print()
+            print('\nMolecules with missing SDS:')
             print(missing_sds)
             print('\nSummary: ')
             print('\t{} SDS files are missing.'.format(len(missing_sds)))
