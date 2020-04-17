@@ -85,7 +85,7 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov
-        python -m pytest --cov=./ --cov-report=xml --assert=plain tests/unit/test_extract_url.py
+        python -m pytest --cov=./ --cov-report=xml tests
 #     - name: Create a package but do not deploy anywhere
 #       run: |
 #         pip install ./
