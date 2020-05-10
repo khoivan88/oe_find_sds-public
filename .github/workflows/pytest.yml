@@ -16,7 +16,7 @@ jobs:
     # The type of runner that the job will run on
 #     runs-on: ubuntu-latest
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       max-parallel: 3
       matrix:
@@ -24,7 +24,7 @@ jobs:
         os: [macos-latest]
         python-version: [3.6, 3.7, 3.8]
 #         python-version: ['3.x']
-    
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -69,12 +69,12 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
+
     - name: Lint with flake8
       run: |
         pip install flake8
@@ -85,7 +85,7 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov
-        python -m pytest --cov=./ --cov-report=xml tests
+        python -m pytest --cov=./ --cov-report=xml tests oe_find_sds
 #     - name: Create a package but do not deploy anywhere
 #       run: |
 #         pip install ./
