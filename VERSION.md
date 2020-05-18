@@ -1,7 +1,14 @@
+## Version 0.9.0 (2020-05-18)
+
+- Feat: Add [TCI](https://www.tcichemicals.com/) as another source for SDS
+- Feat: Add tests for TCI
+- Feat: Add minor script change so that users can apply this script on multiple databases
+- Feat: Add minor change to path implementation to hopefully working in Windows environment
+
 ## Version 0.8.0 (2020-05-10)
 
 - Feat: Add [VWR](https://us.vwr.com/store/search/searchMSDS.jsp) as another source for SDS
-- Feat: Add tests VWR
+- Feat: Add tests for VWR
 - Feat: Remove TCI because of its new website
 
 ## Version 0.7.0 (2020-04-02)

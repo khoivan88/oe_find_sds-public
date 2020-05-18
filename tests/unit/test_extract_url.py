@@ -7,7 +7,8 @@ from oe_find_sds.find_sds import extract_download_url_from_fisher, \
                                     extract_download_url_from_chemicalsafety, \
                                     extract_download_url_from_fluorochem, \
                                     extract_download_url_from_chemblink, \
-                                    extract_download_url_from_vwr
+                                    extract_download_url_from_vwr, \
+                                    extract_download_url_from_tci
 
 
 def mock_raise_exception():
@@ -20,7 +21,7 @@ def mock_raise_exception():
     "cas_nr, expect", [
         ('623-51-8', (
             'Fisher',
-            'https://www.fishersci.com/store/msds?partNumber=AAA1432136&productDescription=ethyl-mercaptoacetate-&vendorId=VN00024248&keyword=true&countryCode=US&language=en'
+            'https://www.fishersci.com/store/msds?partNumber=AAA1432106&productDescription=ethyl-mercaptoacetate-&vendorId=VN00024248&keyword=true&countryCode=US&language=en'
             )
         ),
         ('28697-53-2', (
@@ -235,6 +236,71 @@ def test_extract_url_from_vwr(cas_nr, expect):
     ]
 )
 def test_extract_url_from_vwr_with_exception(monkeypatch, cas_nr, expect):
-    monkeypatch.setattr('oe_find_sds.find_sds.requests.session', mock_raise_exception)
+    monkeypatch.setattr('oe_find_sds.find_sds.requests.Session', mock_raise_exception)
     result = extract_download_url_from_vwr(cas_nr)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    "cas_nr, expect", [
+        ('67-68-5', (
+            'TCI',
+            'https://www.tcichemicals.com/US/en/sds/D0798_US_EN.pdf'
+            )
+        ),
+        ('64-19-7', (
+            'TCI',
+            'https://www.tcichemicals.com/US/en/sds/A2035_US_EN.pdf'
+            )
+        ),
+        ('1450-76-6', (
+            'TCI',
+            'https://www.tcichemicals.com/US/en/sds/H1378_US_EN.pdf'
+            )
+        ),
+        ('885051-07-0', (
+            'TCI',
+            'https://www.tcichemicals.com/US/en/sds/B3296_US_EN.pdf'
+            )
+        ),
+        ('623-51-8', (
+            'TCI',
+            'https://www.tcichemicals.com/US/en/sds/T0211_US_EN.pdf'
+            )
+        ),
+        ('128-50-7', (
+            None,
+            None
+            )
+        ),
+        ('41931-18-4', (
+            None,
+            None
+            )
+        ),
+        ('681128-50-7', (
+            None,
+            None
+            )
+        ),
+        ('00000-00-0', (
+            None,
+            None
+            )
+        ),
+    ]
+)
+def test_extract_url_from_tci(cas_nr, expect):
+    source, url = extract_download_url_from_tci(cas_nr) or (None, None)
+    assert (source, url) == expect
+
+
+@pytest.mark.parametrize(
+    "cas_nr, expect", [
+        ('623-51-8', None)
+    ]
+)
+def test_extract_url_from_tci_with_exception(monkeypatch, cas_nr, expect):
+    monkeypatch.setattr('oe_find_sds.find_sds.requests.Session', mock_raise_exception)
+    result = extract_download_url_from_tci(cas_nr)
     assert result == expect

@@ -22,56 +22,67 @@ This programs does:
 This programs does:
 1. Connect into mysql database and find molecule in 'molecule' table
 of specific database and find those molecule with missing sds
-2. Try to download sds files into a folder in `/var/lib/mysql/missing_sds`
+2. Try to download sds files into a folder in `/var/lib/mysql/missing_sds` (For Linux environment with LAMP stack)
 3. Update those SQL entries with new downloaded sds files
 
 
 ## REQUIREMENTS
 
-- Python 3+
+- Python 3.6+
 - Linux machine root access to the server hosting Open Enventory (to create a download folder if not existed). If user does not have root account (or sudo), you can:
   1. Change the `download_path` to a different location that you have read and write permission.
-  2. Comment out [`exit(1)`](oe_find_sds/find_sds.py#L45) in `find_sds.py` file
-- This file is made for **Linux** environment, you should be able
-  to used it on other OS by changing the location of the ["download_path"](oe_find_sds/find_sds.py#L30)
+  2. Comment out [`exit(1)`](oe_find_sds/find_sds.py#L699) in `find_sds.py` file
 
 
 ## USAGE
 
-After cloning this repo onto the Open Enventory server:
-
 1. Clone this repository:
-   
+
    ```bash
    git clone https://github.com/khoivan88/oe_find_sds-public.git    #if you have git
    # if you don't have git, you can download the zip file then unzip
    ```
 
 2. Change into the directory of the program:
-   
+
    ```bash
    cd oe_find_sds-public
    ```
 
-2. (Optional): create virtual environment for python to install dependency:
+> ---
+> **_NOTE_**
+>
+> - This file is made for **Linux** environment, you should be able
+>   to used it on other OS by changing the location of the ["download_path"](oe_find_sds/find_sds.py#L32)
+>   - Make sure you use an **absolute path**
+>   - For **Windows**:
+>     - Use of either forward slashes (`/`) or backward slashes (`\`) should be ok!
+>     - If you use XAMPP (or similar PHP, Apache, SQL package), you can try this path:
+>
+>       ```python
+>       download_path = r'C:/xampp/mysql/data/missing_sds'
+>       ```
+> ---
+
+3. (Optional): create virtual environment for python to install dependency:
    Note: you can change `oe_find_sds_venv` to another name if desired.
 
    ```bash
-   python3 -m venv oe_find_sds_venv   # Create virtual environment
+   python -m venv oe_find_sds_venv   # Create virtual environment
    source oe_find_sds_venv/bin/activate    # Activate the virtual environment on Linux
    # oe_find_sds_venv\Scripts\activate    # Activate the virtual environment on Windows
    ```
 
-3. Install python dependencies:
-   
+4. Install python dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Run the program:
-   
+5. Run the program:
+
    ```bash
-   python3 oe_find_sds/find_sds.py
+   python oe_find_sds/find_sds.py
    ```
 
    - Answer questions for:
