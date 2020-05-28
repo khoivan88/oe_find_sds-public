@@ -3,7 +3,7 @@ certifi==2020.4.5.1
 chardet==3.0.4
 idna==2.9
 mysql-connector-python==8.0.20
-protobuf==3.12.1
+protobuf==3.12.2
 requests==2.23.0
 six==1.15.0
 urllib3==1.25.9
