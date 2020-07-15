@@ -2,7 +2,7 @@ beautifulsoup4==4.9.1
 certifi==2020.6.20
 chardet==3.0.4
 idna==2.10
-mysql-connector-python==8.0.20
+mysql-connector-python==8.0.21
 protobuf==3.12.2
 requests==2.24.0
 six==1.15.0
