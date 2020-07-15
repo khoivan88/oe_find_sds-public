@@ -59,6 +59,7 @@ def main(database, password):
         # Step1: run SELECT query to find CAS#
         print(f'Database: {database.upper()}')
         print('Getting molecules with missing SDS. Please wait!')
+        # SDS found by OE that are marked as 'Acros' are corrupted, hence the query below
         query = ("SELECT distinct cas_nr FROM molecule WHERE cas_nr!='' AND (default_safety_sheet_blob is NULL or default_safety_sheet_by is NULL or default_safety_sheet_by='Acros')")
         try:
             cursor_select.execute(query)
@@ -67,7 +68,14 @@ def main(database, password):
 
         # Get the set of CAS for molecule missing sds in the database of interest:
         # https://stackoverflow.com/questions/7558908/unpacking-a-list-tuple-of-pairs-into-two-lists-tuples
-        (to_be_downloaded, ) = zip(*cursor_select.fetchall())
+        select_query_result = cursor_select.fetchall()
+        # Exit out of the script if all SDS exist
+        if not select_query_result:
+            print('Nothing to download. Exiting!')
+            exit()
+            
+        (to_be_downloaded, ) = zip(*select_query_result)
+        # Get the unique CAS number set
         to_be_downloaded = set(to_be_downloaded)
 
         # Step 2: downloading sds file
