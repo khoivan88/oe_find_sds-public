@@ -185,7 +185,7 @@ def test_extract_url_from_chemblink_with_exception(monkeypatch, cas_nr, expect):
     assert result == expect
 
 
-# @pytest.mark.xfail
+@pytest.mark.xfail
 @pytest.mark.parametrize(
     "cas_nr, expect", [
         # ('67-68-5', (
